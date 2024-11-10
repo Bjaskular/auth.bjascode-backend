@@ -1,0 +1,39 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: ${DOCKER_PROJECT_NAME}_nginx
+    restart: unless-stopped
+    ports:
+      - "${DOCKER_IP}:${DOCKER_PORT_HTTP}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
+  php:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    container_name: ${DOCKER_PROJECT_NAME}_php
+    depends_on:
+      - mysql
+    volumes:
+      - ../../:/var/www/
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  mysql:
+    image: mysql:latest
+    container_name: ${DOCKER_PROJECT_NAME}_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: gF*W2Ruy509OaYL2
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_TCP_PORT: ${DB_PORT}
+    ports:
+      - "${DOCKER_IP}:${DOCKER_PORT_DB}:${DB_PORT}"
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - ./mysql/data:/var/lib/mysql
+    restart: unless-stopped
