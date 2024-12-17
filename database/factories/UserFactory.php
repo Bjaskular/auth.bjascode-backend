@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
@@ -19,7 +18,7 @@ class UserFactory extends Factory
     {
         return [
             'email' => $this->faker->unique()->freeEmail(),
-            'password' => Str::random(12),
+            'password' => $this->faker->password(10, 20),
         ];
     }
 }
