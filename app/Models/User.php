@@ -15,14 +15,18 @@ class User extends Authenticatable
     use Notifiable;
     use HasApiTokens;
 
-    protected $hidden = [
-        'password'
-    ];
+    protected $guarded = ['id'];
+    protected $hidden = ['password'];
 
     protected function password(): Attribute
     {
         return Attribute::make(
             set: fn (string $password) => Hash::make($password),
         );
+    }
+
+    public function getHashEmail(): ?string
+    {
+        return $this->email ? sha1($this->email): null;
     }
 }
