@@ -7,7 +7,8 @@ use Illuminate\Support\Str;
 
 trait HasUUID
 {
-    public static function booted() {
+    public static function booted()
+    {
         static::creating(function (Model $model) {
             $model->{$model->getKeyName()} = (string) Str::orderedUuid();
         });

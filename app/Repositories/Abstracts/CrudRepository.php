@@ -22,7 +22,7 @@ abstract class CrudRepository implements IRepository
 
     public function clear(): void
     {
-        $this->model = new $this->model;
+        $this->model = new $this->model();
         $this->query = $this->model->query();
     }
 

@@ -29,6 +29,6 @@ class User extends Authenticatable
 
     public function getHashEmail(): ?string
     {
-        return $this->email ? sha1($this->email): null;
+        return $this->email ? sha1($this->email) : null;
     }
 }

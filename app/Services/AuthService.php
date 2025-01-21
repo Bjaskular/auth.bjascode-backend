@@ -9,7 +9,6 @@ use App\Services\Abstracts\Service;
 use App\Services\Interfaces\IAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Laravel\Sanctum\NewAccessToken;
 
 /** @property \App\Repositories\Interfaces\IUserRepository $repository*/
 class AuthService extends Service implements IAuthService

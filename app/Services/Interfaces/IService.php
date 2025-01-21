@@ -4,5 +4,4 @@ namespace App\Services\Interfaces;
 
 interface IService
 {
-
 }
