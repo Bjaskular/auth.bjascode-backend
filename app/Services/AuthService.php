@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\TokenAbility;
 use App\Http\Exceptions\UnauthorizedExcpetion;
 use App\Repositories\UserRepository;
 use App\Services\Abstracts\Service;
@@ -18,7 +19,7 @@ class AuthService extends Service implements IAuthService
         parent::__construct($request, $userRepository);
     }
 
-    public function login(array $requestArray): NewAccessToken
+    public function login(array $requestArray): array
     {
         $user = $this->repository->where('email', $requestArray['email'])->first();
 
@@ -26,6 +27,21 @@ class AuthService extends Service implements IAuthService
             throw new UnauthorizedExcpetion('Email or password is invalid.');
         }
 
-        return $user->createToken($user->getHashEmail(), ['*'], now()->addSeconds((int) config('session.lifetime')));
+        $accessToken = $user->createToken(
+            'access_token',
+            [TokenAbility::ACCESS_API->value],
+            now()->addMinutes(config('sanctum.access_expiration'))
+        );
+
+        $refreshToken = $user->createToken(
+            'refresh_token',
+            [TokenAbility::REFRESH_ACCESS_TOKEN->value],
+            now()->addMinutes(config('sanctum.refresh_expiration'))
+        );
+
+        return [
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken,
+        ];
     }
 }

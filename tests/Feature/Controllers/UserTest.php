@@ -54,7 +54,7 @@ final class UserTest extends TestCase
     }
 
     #[Test]
-    public function login_WhenCredentialsIsCorrect_ShouldCreateLoginSessionByToken(): void
+    public function login_WhenCredentialsIsCorrect_ShouldCreateLoginSessionByTokens(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -63,14 +63,17 @@ final class UserTest extends TestCase
             'Accept' => 'appllication/json'
         ]);
 
-        $cookie = $response->getCookie('AuthBjascode_token', false)->getValue();
+        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false)->getValue();
+        $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false)->getValue();
 
-        $response->assertNoContent()->assertPlainCookie('AuthBjascode_token');
-        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookie)->tokenable()->first()->id);
+        $response->assertNoContent()->assertPlainCookie('auth-bjascode-access-token');
+        $response->assertNoContent()->assertPlainCookie('auth-bjascode-refresh-token');
+        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookieAccess)->tokenable()->first()->id);
+        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookieRefresh)->tokenable()->first()->id);
     }
 
     #[Test]
-    public function login_WhenCreatingToken_ShouldSetAbilitiesToAll(): void
+    public function login_WhenCreatingToken_ShouldCreateTwoAbilitiesForLoginUser(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -80,14 +83,12 @@ final class UserTest extends TestCase
         ]);
 
         $response->assertNoContent();
-        $this->assertDatabaseHas('personal_access_tokens', [
-            'tokenable_id' => $user->id,
-            'abilities' => '["*"]'
-        ]);
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["access-api"]']);
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["refresh-access-token"]']);
     }
 
     #[Test]
-    public function login_WhenRequestReturnedCookieWithLoginToken_ShouldBeValidForOneDay(): void
+    public function login_WhenRequestReturnedCookiesWithLoginTokens_ShouldBeValidLifeTimes(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -96,14 +97,16 @@ final class UserTest extends TestCase
             'Accept' => 'appllication/json'
         ]);
 
-        $cookie = $response->getCookie('AuthBjascode_token', false);
+        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
+        $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false);
 
         $response->assertNoContent();
-        $this->assertEquals($cookie->getExpiresTime(), now()->addDay()->unix());
+        $this->assertEquals($cookieAccess->getExpiresTime(), now()->addDay()->unix());
+        $this->assertEquals($cookieRefresh->getExpiresTime(), now()->addDays(7)->unix());
     }
 
     #[Test]
-    public function login_WhenRequestReturnedCookieWithLoginToken_ShouldHaveSameSiteEqualStrict(): void
+    public function login_WhenRequestReturnedCookiesWithLoginToken_ShouldHaveSameSiteEqualStrict(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -112,9 +115,11 @@ final class UserTest extends TestCase
             'Accept' => 'appllication/json'
         ]);
 
-        $cookie = $response->getCookie('AuthBjascode_token', false);
+        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
+        $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false);
 
         $response->assertNoContent();
-        $this->assertEquals($cookie->getSameSite(), 'strict');
+        $this->assertEquals($cookieAccess->getSameSite(), 'strict');
+        $this->assertEquals($cookieRefresh->getSameSite(), 'strict');
     }
 }
