@@ -122,4 +122,23 @@ final class UserTest extends TestCase
         $this->assertEquals($cookieAccess->getSameSite(), 'strict');
         $this->assertEquals($cookieRefresh->getSameSite(), 'strict');
     }
+
+    #[Test]
+    public function logout_test(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->delete(route('api.logout'), [], [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user)
+        ]);
+
+        $response->assertNoContent();
+    }
+
+    private function getToken(User $user, string $name = 'access_token'): string
+    {
+        return $user->createToken($name, ['*'], now()->addMinute())->plainTextToken;
+    }
 }
