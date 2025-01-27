@@ -43,4 +43,9 @@ class AuthService extends Service implements IAuthService
             'refresh_token' => $refreshToken,
         ];
     }
+
+    public function logout(): void
+    {
+        $this->request->user()->tokens()->delete();
+    }
 }

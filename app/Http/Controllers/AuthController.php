@@ -40,7 +40,9 @@ class AuthController extends Controller
 
     public function logout(): JsonResponse
     {
-        return response()->json();
+        $this->authService->logout();
+
+        return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 
     public function refreshToken(): JsonResponse
