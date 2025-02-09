@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Controllers;
 
+use App\Enums\TokenAbility;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -26,6 +27,12 @@ final class UserTest extends TestCase
             ['password', fn () => 1, 'The password field must be a string.'],
             ['password', fn () => Str::random(300), 'The password field must not be greater than 255 characters.'],
         ];
+    }
+
+    private function getToken(User $user, string $name = 'access_token', array $abilities = ['*'], ?\DateTimeInterface $expiresAt = null): string
+    {
+        $expiresAt ??= now()->addSecond();
+        return $user->createToken($name, $abilities, $expiresAt)->plainTextToken;
     }
 
     #[Test]
@@ -101,7 +108,7 @@ final class UserTest extends TestCase
         $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false);
 
         $response->assertNoContent();
-        $this->assertEquals($cookieAccess->getExpiresTime(), now()->addDay()->unix());
+        $this->assertEquals($cookieAccess->getExpiresTime(), now()->addHour()->unix());
         $this->assertEquals($cookieRefresh->getExpiresTime(), now()->addDays(7)->unix());
     }
 
@@ -124,7 +131,7 @@ final class UserTest extends TestCase
     }
 
     #[Test]
-    public function logout_test(): void
+    public function logout_WhenRequestIsCorrect_ShouldLogoutUser(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -137,8 +144,175 @@ final class UserTest extends TestCase
         $response->assertNoContent();
     }
 
-    private function getToken(User $user, string $name = 'access_token'): string
+    #[Test]
+    public function logout_WhenTokenIsInvalid_ShouldReturnUnauthenticatedError(): void
     {
-        return $user->createToken($name, ['*'], now()->addMinute())->plainTextToken;
+        $response = $this->delete(route('api.logout'), [], [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer test'
+        ]);
+
+        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    #[Test]
+    public function logout_WhenTokenDoesntHaveAccessAbilities_ShouldReturnForbiddenError(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->delete(route('api.logout'), [], [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token', [TokenAbility::ACCESS_API->value])
+        ]);
+
+        $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
+    }
+
+    #[Test]
+    public function refreshToken_WhenTokenIsInvalid_ShouldReturnUnauthenticatedError(): void
+    {
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer test'
+        ]);
+
+        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    #[Test]
+    public function refreshToken_WhenTokenDoesntHaveRefreshAbilities_ShouldForbiddenReturnError(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken(
+                user: $user,
+                abilities: [TokenAbility::ACCESS_API->value]
+            )
+        ]);
+
+        $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
+    }
+
+    #[Test]
+    public function refreshToken_WhenRefreshTokenIsExpired_ShouldReturnUnauthorizedError(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token', [TokenAbility::REFRESH_ACCESS_TOKEN->value], now()->subDay())
+        ]);
+
+        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    #[Test]
+    public function refreshToken_WhenRefreshedToken_ShouldCreateNewAccessToken(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $this->getToken($user, 'access_token');
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+        ]);
+
+        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false)->getValue();
+
+        $response->assertNoContent()->assertPlainCookie('auth-bjascode-access-token');
+        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookieAccess)->tokenable()->first()->id);
+    }
+
+    #[Test]
+    public function refreshToken_WhenRefreshedToken_ShouldDeletedOldAccessToken(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $oldToken = $this->getToken($user, 'access_token');
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+        ]);
+
+        $response->assertNoContent();
+        $this->assertDatabaseCount('personal_access_tokens', 2);
+        $this->assertDatabaseMissing('personal_access_tokens', ['token' => $oldToken]);
+    }
+
+    #[Test]
+    public function refreshToken_WhenRefreshedToken_ShouldDeletedOldAccessTokenOnlyForRequestUser(): void
+    {
+        /** @var \App\Models\User $user */
+        $users = User::factory()->count(2)->create(['password' => 'zaq1@WSX']);
+        $refreshToken = $this->getToken($users[0], 'refresh_token');
+        $this->getToken($users[0], 'access_token');
+        $this->getToken($users[1], 'access_token');
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $refreshToken
+        ]);
+
+        $response->assertNoContent();
+        $this->assertDatabaseCount('personal_access_tokens', 3);
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $users[0]->id, 'name' => 'access_token']);
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $users[0]->id, 'name' => 'refresh_token']);
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $users[1]->id, 'name' => 'access_token']);
+    }
+
+    #[Test]
+    public function refreshToken_WhenCreatingNewAccessToken_ShouldCreateAbilityForAccess(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+        ]);
+
+        $response->assertNoContent();
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["access-api"]']);
+    }
+
+    #[Test]
+    public function refreshToken_WhenRequestReturnedCookiesWithAccessTokens_ShouldBeValidLifeTimes(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+        ]);
+
+        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
+
+        $response->assertNoContent();
+        $this->assertEquals($cookieAccess->getExpiresTime(), now()->addHour()->unix());
+    }
+
+    #[Test]
+    public function refreshToken_WhenRequestReturnedCookiesWithAccessToken_ShouldHaveSameSiteEqualStrict(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->get(route('api.refresh_token'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+        ]);
+
+        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
+
+        $response->assertNoContent();
+        $this->assertEquals($cookieAccess->getSameSite(), 'strict');
     }
 }
