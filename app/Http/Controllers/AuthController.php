@@ -23,11 +23,11 @@ class AuthController extends Controller
         $userAccess = $this->authService->login($request->validated());
 
         return response()
-            ->json([], Response::HTTP_NO_CONTENT)
+            ->json(null, Response::HTTP_NO_CONTENT)
             ->withCookie(Cookie::make(
                 name: AuthCookieName::API_ACCESS->value,
                 value: $userAccess['access_token']->plainTextToken,
-                minutes: config('sanctum.access_expiration', 60 * 24),
+                minutes: config('sanctum.access_expiration', 60),
                 sameSite: config('session.same_site', 'strict')
             ))
             ->withCookie(Cookie::make(
@@ -47,7 +47,16 @@ class AuthController extends Controller
 
     public function refreshToken(): JsonResponse
     {
-        return response()->json();
+        $accessToken = $this->authService->refreshAccessToken();
+
+        return response()
+            ->json(null, Response::HTTP_NO_CONTENT)
+            ->withCookie(Cookie::make(
+                name: AuthCookieName::API_ACCESS->value,
+                value: $accessToken->plainTextToken,
+                minutes: config('sanctum.access_expiration', 60),
+                sameSite: config('session.same_site', 'strict')
+            ));
     }
 
     public function me(): JsonResponse
