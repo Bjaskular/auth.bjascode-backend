@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\AuthCookieName;
 use App\Enums\TokenAbility;
 use App\Http\Exceptions\UnauthorizedExcpetion;
 use App\Repositories\UserRepository;
@@ -9,6 +10,7 @@ use App\Services\Abstracts\Service;
 use App\Services\Interfaces\IAuthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\NewAccessToken;
 
 /** @property \App\Repositories\Interfaces\IUserRepository $repository*/
 class AuthService extends Service implements IAuthService
@@ -47,5 +49,18 @@ class AuthService extends Service implements IAuthService
     public function logout(): void
     {
         $this->request->user()->tokens()->delete();
+    }
+
+    public function refreshAccessToken(): NewAccessToken
+    {
+        $user = $this->request->user();
+
+        $user->tokens()->where('name', 'access_token')->delete();
+
+        return $user->createToken(
+            'access_token',
+            [TokenAbility::ACCESS_API->value],
+            now()->addMinutes(config('sanctum.access_expiration'))
+        );
     }
 }
