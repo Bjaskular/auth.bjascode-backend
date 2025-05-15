@@ -3,13 +3,16 @@
 namespace Tests\Feature\Controllers;
 
 use App\Enums\TokenAbility;
+use App\Models\Application;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use App\Models\UserApplication;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use Tests\Tools\Providers\ProviderData;
 
 final class UserTest extends TestCase
 {
@@ -18,14 +21,14 @@ final class UserTest extends TestCase
     public static function login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError_Provider(): array
     {
         return [
-            ['email', fn () => null, 'The email field is required.'],
-            ['email', fn () => 1, 'The email field must be a string.'],
-            ['email', fn () => 'test', 'The email field must be a valid email address.'],
-            ['email', fn () => Str::random(300). '@yahoo.com', 'The email field must not be greater than 255 characters.'],
-            ['email', fn () => Str::random(4). '@yahoo.com', 'The selected email is invalid.'],
-            ['password', fn () => null, 'The password field is required.'],
-            ['password', fn () => 1, 'The password field must be a string.'],
-            ['password', fn () => Str::random(300), 'The password field must not be greater than 255 characters.'],
+            [ProviderData::createInstance(field: 'email', key: 'email', value: null, errorMessage: 'validation.required')],
+            [ProviderData::createInstance(field: 'email', key: 'email', value: 1, errorMessage: 'validation.string')],
+            [ProviderData::createInstance(field: 'email', key: 'email', value: 'test', errorMessage: 'validation.email')],
+            [ProviderData::createInstance(field: 'email', key: 'email', value: Str::random(300), errorMessage: 'validation.max.string')],
+            [ProviderData::createInstance(field: 'email', key: 'email', value: Str::random(4). '@yahoo.com', errorMessage: 'validation.exists')],
+            [ProviderData::createInstance(field: 'password', key: 'password', value: null, errorMessage: 'validation.required')],
+            [ProviderData::createInstance(field: 'password', key: 'password', value: 1, errorMessage: 'validation.string')],
+            [ProviderData::createInstance(field: 'password', key: 'password', value: Str::random(300), errorMessage: 'validation.max.string')],
         ];
     }
 
@@ -37,14 +40,14 @@ final class UserTest extends TestCase
 
     #[Test]
     #[DataProvider('login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError_Provider')]
-    public function login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError(string $field, \Closure $value, string $errorMessage): void
+    public function login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError(ProviderData $data): void
     {
-        $body = [$field => $value()];
+        $body = [$data->field => $data->value];
         $response = $this->post(route('api.login'), $body, [
             'Accept' => 'appllication/json'
         ]);
 
-        $response->assertUnprocessable()->assertJsonValidationErrors([$field => $errorMessage]);
+        $response->assertUnprocessable()->assertJsonValidationErrors([$data->key => $data->errorMessage]);
     }
 
     #[Test]
@@ -314,5 +317,31 @@ final class UserTest extends TestCase
 
         $response->assertNoContent();
         $this->assertEquals($cookieAccess->getSameSite(), 'strict');
+    }
+
+    #[Test]
+    public function me_test(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $applications = Application::factory()
+            ->sequence(
+                ['key' => 'admin'],
+                ['key' => 'account'],
+            )
+            ->count(2)
+            ->create();
+
+        UserApplication::factory()
+            ->for($user)
+            ->create(['application_id' => $applications[0]->id]);
+
+        $query = ['key' => $applications[1]->key];
+        $response = $this->get(route('api.me', $query), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+        ]);
+
+        $response->assertNoContent();
     }
 }
