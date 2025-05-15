@@ -12,10 +12,10 @@ return new class () extends Migration {
     {
         Schema::create('applications', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('key');
+            $table->string('name', 100);
+            $table->string('key', 50)->unique();
             $table->string('url');
-            $table->string('secret');
+            $table->string('secret', 50);
             $table->timestamps();
         });
     }
