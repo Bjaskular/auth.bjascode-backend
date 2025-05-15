@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\AuthCookieName;
 use App\Enums\TokenAbility;
-use App\Http\Exceptions\UnauthorizedExcpetion;
+use App\Http\Exceptions\ForbiddenException;
+use App\Http\Exceptions\UnauthorizedException;
+use App\Models\User;
 use App\Repositories\UserRepository;
 use App\Services\Abstracts\Service;
 use App\Services\Interfaces\IAuthService;
@@ -25,7 +26,7 @@ class AuthService extends Service implements IAuthService
         $user = $this->repository->where('email', $requestArray['email'])->first();
 
         if (! Hash::check($requestArray['password'], $user->password)) {
-            throw new UnauthorizedExcpetion('Email or password is invalid.');
+            throw new UnauthorizedException('Email or password is invalid.');
         }
 
         $accessToken = $user->createToken(
@@ -62,5 +63,22 @@ class AuthService extends Service implements IAuthService
             [TokenAbility::ACCESS_API->value],
             now()->addMinutes(config('sanctum.access_expiration'))
         );
+    }
+
+    public function authorize(array $requestArray): User
+    {
+        $user = $this->repository
+            ->with('application', fn ($query) => $query->where('key', $requestArray['key']))
+            ->whereHas('application', fn ($query) => $query->where('key', $requestArray['key']))
+            ->where('users.id', $this->request->user()->id)
+            ->first();
+
+        dd($user);
+
+        if (! $user) {
+            throw new ForbiddenException("You don't have access.");
+        }
+
+        return $user;
     }
 }
