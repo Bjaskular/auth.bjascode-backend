@@ -5,7 +5,7 @@ namespace App\Http\Exceptions;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-final class UnauthorizedExcpetion extends HttpException
+final class UnauthorizedException extends HttpException
 {
     public function __construct(string $message = '')
     {
