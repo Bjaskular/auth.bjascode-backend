@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::name('login')->post('/login', [AuthController::class, 'login']);
 Route::group(['middleware' => ['auth:sanctum']], function () {
-    // Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/me', [AuthController::class, 'me'])->name('me');
 
     Route::get('/refresh', [AuthController::class, 'refreshToken'])
         ->middleware('abilities:'. AuthCookieName::REFRESH->value)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AuthCookieName;
+use App\Http\Requests\Auth\AuthorizationRequest;
 use App\Http\Requests\Auth\LoginUserRequest;
 use App\Services\Interfaces\IAuthService;
 use Illuminate\Http\JsonResponse;
@@ -11,11 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
 {
-    private readonly IAuthService $authService;
-
-    public function __construct(IAuthService $authService)
+    public function __construct(private readonly IAuthService $authService)
     {
-        $this->authService = $authService;
     }
 
     public function login(LoginUserRequest $request): JsonResponse
@@ -59,8 +57,10 @@ class AuthController extends Controller
             ));
     }
 
-    public function me(): JsonResponse
+    public function me(AuthorizationRequest $request): JsonResponse
     {
-        return response()->json();
+        $this->authService->authorize($request->validated());
+
+        return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 }
