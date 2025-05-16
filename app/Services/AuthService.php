@@ -6,7 +6,8 @@ use App\Enums\TokenAbility;
 use App\Http\Exceptions\ForbiddenException;
 use App\Http\Exceptions\UnauthorizedException;
 use App\Models\User;
-use App\Repositories\UserRepository;
+use App\Repositories\Interfaces\IApplicationRepository;
+use App\Repositories\Interfaces\IUserRepository;
 use App\Services\Abstracts\Service;
 use App\Services\Interfaces\IAuthService;
 use Illuminate\Http\Request;
@@ -16,9 +17,15 @@ use Laravel\Sanctum\NewAccessToken;
 /** @property \App\Repositories\Interfaces\IUserRepository $repository*/
 class AuthService extends Service implements IAuthService
 {
-    public function __construct(Request $request, UserRepository $userRepository)
-    {
+    private readonly IApplicationRepository $applicationRepository;
+
+    public function __construct(
+        Request $request,
+        IUserRepository $userRepository,
+        IApplicationRepository $applicationRepository,
+    ) {
         parent::__construct($request, $userRepository);
+        $this->applicationRepository = $applicationRepository;
     }
 
     public function login(array $requestArray): array
@@ -41,9 +48,18 @@ class AuthService extends Service implements IAuthService
             now()->addMinutes(config('sanctum.refresh_expiration'))
         );
 
+        $appUrl = ! is_null($requestArray['redirect_key'] ?? null)
+            ? $this->applicationRepository
+                ->select(['url'])
+                ->where('key', $requestArray['redirect_key'])
+                ->first()
+                ->url
+            : null;
+
         return [
             'access_token' => $accessToken,
             'refresh_token' => $refreshToken,
+            'redirect_url' => $appUrl
         ];
     }
 
