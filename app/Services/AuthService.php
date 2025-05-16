@@ -26,7 +26,7 @@ class AuthService extends Service implements IAuthService
         $user = $this->repository->where('email', $requestArray['email'])->first();
 
         if (! Hash::check($requestArray['password'], $user->password)) {
-            throw new UnauthorizedException('Email or password is invalid.');
+            throw new UnauthorizedException(__('validation.login_failed'));
         }
 
         $accessToken = $user->createToken(
@@ -68,15 +68,13 @@ class AuthService extends Service implements IAuthService
     public function authorize(array $requestArray): User
     {
         $user = $this->repository
-            ->with('application', fn ($query) => $query->where('key', $requestArray['key']))
+            ->with('application', fn ($query) => $query->select(['key', 'secret'])->where('key', $requestArray['key']))
             ->whereHas('application', fn ($query) => $query->where('key', $requestArray['key']))
             ->where('users.id', $this->request->user()->id)
             ->first();
 
-        dd($user);
-
         if (! $user) {
-            throw new ForbiddenException("You don't have access.");
+            throw new ForbiddenException(__('validation.forbidden_access'));
         }
 
         return $user;
