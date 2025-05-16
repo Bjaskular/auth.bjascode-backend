@@ -23,6 +23,7 @@ class LoginUserRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'redirect_key' => ['sometimes', 'string', 'nullable', 'max:50', Rule::exists('applications', 'key')],
             'email' => ['required', 'string', 'email:rfc,dns', 'max:255', Rule::exists('users', 'email')],
             'password' => ['required', 'string', 'max:255'],
         ];
