@@ -20,7 +20,7 @@ class ApplicationFactory extends Factory
             'name' => $this->faker->word(),
             'key' => $this->faker->unique()->word(),
             'url' => $this->faker->url(),
-            'secret' => base64_encode($this->faker->word()),
+            'secret' => base64_encode($this->faker->words(3, true)),
         ];
     }
 }
