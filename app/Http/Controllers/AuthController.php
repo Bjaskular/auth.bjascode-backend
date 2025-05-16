@@ -11,12 +11,29 @@ use App\Services\Interfaces\IAuthService;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * @group Authorization
+ */
 class AuthController extends Controller
 {
-    public function __construct(private readonly IAuthService $authService)
+    private readonly IAuthService $authService;
+
+    public function __construct(IAuthService $authService)
     {
+        $this->authService = $authService;
     }
 
+    /**
+     * GET: Login user
+     *
+     * Returns access and refresh tokens with redirect url.
+     *
+     * @bodyParam redirect_key string Example: admin
+     * @bodyParam email string required Example: test1@wp.pl
+     * @bodyParam password string required Example: zaq1@WSX
+     *
+     * @bjasResponseFile app/DocResponses/auth_controller_login.json {"pagination": false}
+     */
     public function login(LoginUserRequest $request): JsonResponse
     {
         $userAccess = $this->authService->login($request->validated());
