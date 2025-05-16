@@ -24,6 +24,9 @@ final class UserTest extends TestCase
     public static function login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError_Provider(): array
     {
         return [
+            [ProviderData::createInstance(field: 'redirect_key', key: 'redirect_key', value: 1, errorMessage: 'validation.string')],
+            [ProviderData::createInstance(field: 'redirect_key', key: 'redirect_key', value: Str::random(51), errorMessage: 'validation.max.string')],
+            [ProviderData::createInstance(field: 'redirect_key', key: 'redirect_key', value: 'xyz', errorMessage: 'validation.exists')],
             [ProviderData::createInstance(field: 'email', key: 'email', value: null, errorMessage: 'validation.required')],
             [ProviderData::createInstance(field: 'email', key: 'email', value: 1, errorMessage: 'validation.string')],
             [ProviderData::createInstance(field: 'email', key: 'email', value: 'test', errorMessage: 'validation.email')],
@@ -81,7 +84,7 @@ final class UserTest extends TestCase
         $response->assertOk()
             ->assertJson(
                 fn (AssertableJson $json) =>
-                $json->has('data', 2)
+                $json->has('data', 3)
                     ->has('data.access_token', 4)
                     ->has('data.refresh_token', 4)
                     ->hasAll([
@@ -93,6 +96,7 @@ final class UserTest extends TestCase
                         'data.refresh_token.value',
                         'data.refresh_token.ttl',
                         'data.refresh_token.expired_at',
+                        'data.redirect_url',
                     ])
                     ->whereAll([
                         'data.access_token.name' => AuthCookieName::API_ACCESS->value,
@@ -101,11 +105,41 @@ final class UserTest extends TestCase
                         'data.refresh_token.name' => AuthCookieName::REFRESH->value,
                         'data.refresh_token.ttl' => 604800,
                         'data.refresh_token.expired_at' => now()->addWeek()->unix(),
+                        'data.redirect_url' => null,
                     ])
             );
 
         $this->assertEquals($user->id, PersonalAccessToken::findToken($responseBody['access_token']['value'])->tokenable()->first()->id);
         $this->assertEquals($user->id, PersonalAccessToken::findToken($responseBody['refresh_token']['value'])->tokenable()->first()->id);
+    }
+
+    #[Test]
+    public function login_WhenRequestHasRedirectKey_ShouldReturnRedirectUrlInResponse(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $application = Application::factory()->create();
+        UserApplication::factory()
+            ->for($user)
+            ->for($application)
+            ->create();
+
+        $body = [
+            'redirect_key' => $application->key,
+            'email' => $user->email,
+            'password' => 'zaq1@WSX'
+        ];
+
+        $response = $this->post(route('api.login'), $body, [
+            'Accept' => 'appllication/json'
+        ]);
+
+        $response->assertOk()
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('data', 3)
+                    ->whereAll(['data.redirect_url' => $application->url])
+            );
     }
 
     #[Test]
