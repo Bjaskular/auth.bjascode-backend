@@ -28,6 +28,7 @@ class AuthenticationResource extends JsonResource
                 'ttl' => config('sanctum.refresh_expiration') * 60,
                 'expired_at' => now()->addMinutes(config('sanctum.refresh_expiration'))->unix(),
             ],
+            'redirect_url' => $this->resource['redirect_url']
         ];
     }
 }
