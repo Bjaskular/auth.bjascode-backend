@@ -2,13 +2,16 @@
 
 namespace Tests\Feature\Controllers;
 
+use App\Enums\AuthCookieName;
 use App\Enums\TokenAbility;
 use App\Models\Application;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Models\UserApplication;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
+use Illuminate\Testing\Fluent\AssertableJson;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -60,7 +63,7 @@ final class UserTest extends TestCase
             'Accept' => 'appllication/json'
         ]);
 
-        $response->assertUnauthorized()->assertJsonPath('message', 'Email or password is invalid.');
+        $response->assertUnauthorized()->assertJsonPath('message', 'validation.login_failed');
     }
 
     #[Test]
@@ -73,13 +76,36 @@ final class UserTest extends TestCase
             'Accept' => 'appllication/json'
         ]);
 
-        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false)->getValue();
-        $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false)->getValue();
+        $responseBody = json_decode($response->baseResponse->getContent(), true)['data'];
 
-        $response->assertNoContent()->assertPlainCookie('auth-bjascode-access-token');
-        $response->assertNoContent()->assertPlainCookie('auth-bjascode-refresh-token');
-        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookieAccess)->tokenable()->first()->id);
-        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookieRefresh)->tokenable()->first()->id);
+        $response->assertOk()
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('data', 2)
+                    ->has('data.access_token', 4)
+                    ->has('data.refresh_token', 4)
+                    ->hasAll([
+                        'data.access_token.name',
+                        'data.access_token.value',
+                        'data.access_token.ttl',
+                        'data.access_token.expired_at',
+                        'data.refresh_token.name',
+                        'data.refresh_token.value',
+                        'data.refresh_token.ttl',
+                        'data.refresh_token.expired_at',
+                    ])
+                    ->whereAll([
+                        'data.access_token.name' => AuthCookieName::API_ACCESS->value,
+                        'data.access_token.ttl' => 3600,
+                        'data.access_token.expired_at' => now()->addHour()->unix(),
+                        'data.refresh_token.name' => AuthCookieName::REFRESH->value,
+                        'data.refresh_token.ttl' => 604800,
+                        'data.refresh_token.expired_at' => now()->addWeek()->unix(),
+                    ])
+            );
+
+        $this->assertEquals($user->id, PersonalAccessToken::findToken($responseBody['access_token']['value'])->tokenable()->first()->id);
+        $this->assertEquals($user->id, PersonalAccessToken::findToken($responseBody['refresh_token']['value'])->tokenable()->first()->id);
     }
 
     #[Test]
@@ -92,45 +118,9 @@ final class UserTest extends TestCase
             'Accept' => 'appllication/json'
         ]);
 
-        $response->assertNoContent();
-        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["access-api"]']);
-        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["refresh-access-token"]']);
-    }
-
-    #[Test]
-    public function login_WhenRequestReturnedCookiesWithLoginTokens_ShouldBeValidLifeTimes(): void
-    {
-        /** @var \App\Models\User $user */
-        $user = User::factory()->create(['password' => 'zaq1@WSX']);
-
-        $response = $this->post(route('api.login'), ['email' => $user->email, 'password' => 'zaq1@WSX'], [
-            'Accept' => 'appllication/json'
-        ]);
-
-        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
-        $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false);
-
-        $response->assertNoContent();
-        $this->assertEquals($cookieAccess->getExpiresTime(), now()->addHour()->unix());
-        $this->assertEquals($cookieRefresh->getExpiresTime(), now()->addDays(7)->unix());
-    }
-
-    #[Test]
-    public function login_WhenRequestReturnedCookiesWithLoginToken_ShouldHaveSameSiteEqualStrict(): void
-    {
-        /** @var \App\Models\User $user */
-        $user = User::factory()->create(['password' => 'zaq1@WSX']);
-
-        $response = $this->post(route('api.login'), ['email' => $user->email, 'password' => 'zaq1@WSX'], [
-            'Accept' => 'appllication/json'
-        ]);
-
-        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
-        $cookieRefresh = $response->getCookie('auth-bjascode-refresh-token', false);
-
-        $response->assertNoContent();
-        $this->assertEquals($cookieAccess->getSameSite(), 'strict');
-        $this->assertEquals($cookieRefresh->getSameSite(), 'strict');
+        $response->assertOk();
+        $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["access-api"]'])
+            ->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["refresh-access-token"]']);
     }
 
     #[Test]
@@ -166,7 +156,11 @@ final class UserTest extends TestCase
 
         $response = $this->delete(route('api.logout'), [], [
             'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token', [TokenAbility::ACCESS_API->value])
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'refresh_token',
+                [TokenAbility::REFRESH_ACCESS_TOKEN->value]
+            )
         ]);
 
         $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
@@ -208,7 +202,12 @@ final class UserTest extends TestCase
 
         $response = $this->get(route('api.refresh_token'), [
             'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token', [TokenAbility::REFRESH_ACCESS_TOKEN->value], now()->subDay())
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'refresh_token',
+                [TokenAbility::REFRESH_ACCESS_TOKEN->value],
+                now()->subDay()
+            )
         ]);
 
         $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
@@ -226,10 +225,26 @@ final class UserTest extends TestCase
             'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
         ]);
 
-        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false)->getValue();
+        $responseBody = json_decode($response->baseResponse->getContent(), true)['data'];
 
-        $response->assertNoContent()->assertPlainCookie('auth-bjascode-access-token');
-        $this->assertEquals($user->id, PersonalAccessToken::findToken($cookieAccess)->tokenable()->first()->id);
+        $response->assertOk()
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('data', 4)
+                    ->hasAll([
+                        'data.name',
+                        'data.value',
+                        'data.ttl',
+                        'data.expired_at',
+                    ])
+                    ->whereAll([
+                        'data.name' => AuthCookieName::API_ACCESS->value,
+                        'data.ttl' => 3600,
+                        'data.expired_at' => now()->addHour()->unix(),
+                    ])
+            );
+
+        $this->assertEquals($user->id, PersonalAccessToken::findToken($responseBody['value'])->tokenable()->first()->id);
     }
 
     #[Test]
@@ -244,7 +259,7 @@ final class UserTest extends TestCase
             'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
         ]);
 
-        $response->assertNoContent();
+        $response->assertOk();
         $this->assertDatabaseCount('personal_access_tokens', 2);
         $this->assertDatabaseMissing('personal_access_tokens', ['token' => $oldToken]);
     }
@@ -263,7 +278,7 @@ final class UserTest extends TestCase
             'Authorization' => 'Bearer '. $refreshToken
         ]);
 
-        $response->assertNoContent();
+        $response->assertOk();
         $this->assertDatabaseCount('personal_access_tokens', 3);
         $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $users[0]->id, 'name' => 'access_token']);
         $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $users[0]->id, 'name' => 'refresh_token']);
@@ -281,46 +296,81 @@ final class UserTest extends TestCase
             'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
         ]);
 
-        $response->assertNoContent();
+        $response->assertOk();
         $this->assertDatabaseHas('personal_access_tokens', ['tokenable_id' => $user->id, 'abilities' => '["access-api"]']);
     }
 
     #[Test]
-    public function refreshToken_WhenRequestReturnedCookiesWithAccessTokens_ShouldBeValidLifeTimes(): void
+    public function me_WhenUserHasAccessToApplication_ShouldReturnAccessInfo(): void
     {
         /** @var \App\Models\User $user */
-        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $user = User::factory()
+            ->create(['password' => 'zaq1@WSX']);
 
-        $response = $this->get(route('api.refresh_token'), [
+        $application = Application::factory()
+            ->create(['key' => 'admin']);
+
+        UserApplication::factory()
+            ->for($user)
+            ->for($application)
+            ->create();
+
+        $query = ['key' => $application->key];
+        $response = $this->get(route('api.me', $query), [
             'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'access-token',
+                [TokenAbility::ACCESS_API->value]
+            )
         ]);
 
-        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
+        $response->assertOk()
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('data', 3)
+                    ->whereAll([
+                        'data.id' => $user->id,
+                        'data.application_key' => $application->key,
+                    ])
+            );
 
-        $response->assertNoContent();
-        $this->assertEquals($cookieAccess->getExpiresTime(), now()->addHour()->unix());
+        $encryptSecret = json_decode($response->baseResponse->getContent(), true)['data']['application_secret'];
+
+        $this->assertEquals($application->secret, Crypt::decryptString($encryptSecret));
     }
 
     #[Test]
-    public function refreshToken_WhenRequestReturnedCookiesWithAccessToken_ShouldHaveSameSiteEqualStrict(): void
+    public function me_WhenTokenIsExpired_ShouldReturnUnauthorizedError(): void
     {
         /** @var \App\Models\User $user */
-        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $user = User::factory()
+            ->create(['password' => 'zaq1@WSX']);
 
-        $response = $this->get(route('api.refresh_token'), [
+        $application = Application::factory()
+            ->create(['key' => 'admin']);
+
+        UserApplication::factory()
+            ->for($user)
+            ->for($application)
+            ->create();
+
+        $query = ['key' => $application->key];
+        $response = $this->get(route('api.me', $query), [
             'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'access-token',
+                [TokenAbility::ACCESS_API->value],
+                now()->subDay()
+            )
         ]);
 
-        $cookieAccess = $response->getCookie('auth-bjascode-access-token', false);
-
-        $response->assertNoContent();
-        $this->assertEquals($cookieAccess->getSameSite(), 'strict');
+        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
     }
 
     #[Test]
-    public function me_test(): void
+    public function me_WhenUserDoesntHaveAccessToApplication_ShouldReturnForbiddenError(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -339,9 +389,13 @@ final class UserTest extends TestCase
         $query = ['key' => $applications[1]->key];
         $response = $this->get(route('api.me', $query), [
             'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token')
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'access-token',
+                [TokenAbility::ACCESS_API->value]
+            )
         ]);
 
-        $response->assertNoContent();
+        $response->assertForbidden()->assertJsonPath('message', 'validation.forbidden_access');
     }
 }
