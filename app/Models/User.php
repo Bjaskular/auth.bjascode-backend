@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -29,6 +30,13 @@ class User extends Authenticatable
         );
     }
 
+    protected function userName(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => Str::before($this->email, '@'),
+        );
+    }
+
     public function getHashEmail(): ?string
     {
         return $this->email ? sha1($this->email) : null;
@@ -36,7 +44,14 @@ class User extends Authenticatable
 
     public function applications(): HasManyThrough
     {
-        return $this->hasManyThrough(Application::class, UserApplication::class);
+        return $this->hasManyThrough(
+            Application::class,
+            UserApplication::class,
+            'user_id',
+            'id',
+            'id',
+            'application_id'
+        );
     }
 
     public function application(): HasOneThrough

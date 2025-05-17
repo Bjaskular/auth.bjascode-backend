@@ -45,6 +45,37 @@ final class UserTest extends TestCase
     }
 
     #[Test]
+    public function middleware_WhenTokenIsInvalid_ShouldReturnUnauthenticatedError(): void
+    {
+        $responseMe = $this->get(route('api.me'), [ 'Accept' => 'appllication/json', 'Authorization' => 'Bearer test']);
+        $responseAuthorize = $this->get(route('api.authorize'), [ 'Accept' => 'appllication/json', 'Authorization' => 'Bearer test']);
+        $responseRefresh = $this->get(route('api.refresh_token'), [ 'Accept' => 'appllication/json', 'Authorization' => 'Bearer test']);
+        $responseDelete = $this->delete(route('api.logout'), [], ['Accept' => 'appllication/json', 'Authorization' => 'Bearer test']);
+
+        $responseMe->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+        $responseAuthorize->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+        $responseDelete->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+        $responseRefresh->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    #[Test]
+    public function middleware_WhenTokenIsExpired_ShouldReturnUnauthorizedError(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $responseMe = $this->get(route('api.me'), ['Accept' => 'appllication/json', 'Authorization' => 'Bearer '. $this->getToken($user, 'access_token', [TokenAbility::ACCESS_API->value], now()->subDay())]);
+        $responseAuthorize = $this->get(route('api.authorize'), ['Accept' => 'appllication/json', 'Authorization' => 'Bearer '. $this->getToken($user, 'access_token', [TokenAbility::ACCESS_API->value], now()->subDay())]);
+        $responseRefresh = $this->get(route('api.refresh_token'), ['Accept' => 'appllication/json', 'Authorization' => 'Bearer '. $this->getToken($user, 'refresh_token', [TokenAbility::REFRESH_ACCESS_TOKEN->value], now()->subDay())]);
+        $responseDelete = $this->delete(route('api.logout'), [], ['Accept' => 'appllication/json', 'Authorization' => 'Bearer '. $this->getToken($user, 'access_token', [TokenAbility::ACCESS_API->value], now()->subDay())]);
+
+        $responseMe->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+        $responseAuthorize->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+        $responseRefresh->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+        $responseDelete->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
+    }
+
+    #[Test]
     #[DataProvider('login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError_Provider')]
     public function login_WhenRequestIsIncorrect_ShouldReturnUnprocessableError(ProviderData $data): void
     {
@@ -114,6 +145,33 @@ final class UserTest extends TestCase
     }
 
     #[Test]
+    public function login_WhenTokensWasCreatedAndAreValid_ShouldOverrideTokens(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $loginToken = $user->createToken(
+            'access_token',
+            [TokenAbility::ACCESS_API->value],
+            now()->addMinutes(config('sanctum.access_expiration'))
+        );
+
+        $refreshToken = $user->createToken(
+            'refresh_token',
+            [TokenAbility::REFRESH_ACCESS_TOKEN->value],
+            now()->addMinutes(config('sanctum.refresh_expiration'))
+        );
+
+        $response = $this->post(route('api.login'), ['email' => $user->email, 'password' => 'zaq1@WSX'], [
+            'Accept' => 'appllication/json'
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseMissing($loginToken->accessToken);
+        $this->assertDatabaseMissing($refreshToken->accessToken);
+    }
+
+    #[Test]
     public function login_WhenRequestHasRedirectKey_ShouldReturnRedirectUrlInResponse(): void
     {
         /** @var \App\Models\User $user */
@@ -172,47 +230,21 @@ final class UserTest extends TestCase
     }
 
     #[Test]
-    public function logout_WhenTokenIsInvalid_ShouldReturnUnauthenticatedError(): void
-    {
-        $response = $this->delete(route('api.logout'), [], [
-            'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer test'
-        ]);
-
-        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
-    }
-
-    #[Test]
-    public function logout_WhenTokenDoesntHaveAccessAbilities_ShouldReturnForbiddenError(): void
+    public function logout_WhenTokenHasIncorrectAbilities_ShouldForbiddenReturnError(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
 
-        $response = $this->delete(route('api.logout'), [], [
+        $response = $this->get(route('api.refresh_token'), [
             'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken(
-                $user,
-                'refresh_token',
-                [TokenAbility::REFRESH_ACCESS_TOKEN->value]
-            )
+            'Authorization' => 'Bearer '. $this->getToken($user, 'access_token', [TokenAbility::ACCESS_API->value])
         ]);
 
         $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
     }
 
     #[Test]
-    public function refreshToken_WhenTokenIsInvalid_ShouldReturnUnauthenticatedError(): void
-    {
-        $response = $this->get(route('api.refresh_token'), [
-            'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer test'
-        ]);
-
-        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
-    }
-
-    #[Test]
-    public function refreshToken_WhenTokenDoesntHaveRefreshAbilities_ShouldForbiddenReturnError(): void
+    public function refreshToken_WhenTokenHasIncorrectAbilities_ShouldForbiddenReturnError(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -226,25 +258,6 @@ final class UserTest extends TestCase
         ]);
 
         $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
-    }
-
-    #[Test]
-    public function refreshToken_WhenRefreshTokenIsExpired_ShouldReturnUnauthorizedError(): void
-    {
-        /** @var \App\Models\User $user */
-        $user = User::factory()->create(['password' => 'zaq1@WSX']);
-
-        $response = $this->get(route('api.refresh_token'), [
-            'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken(
-                $user,
-                'refresh_token',
-                [TokenAbility::REFRESH_ACCESS_TOKEN->value],
-                now()->subDay()
-            )
-        ]);
-
-        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
     }
 
     #[Test]
@@ -335,7 +348,25 @@ final class UserTest extends TestCase
     }
 
     #[Test]
-    public function me_WhenUserHasAccessToApplication_ShouldReturnAccessInfo(): void
+    public function authorize_WhenTokenHasIncorrectAbilities_ShouldForbiddenReturnError(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $query = ['key' => 'test'];
+        $response = $this->get(route('api.authorize', $query), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken(
+                user: $user,
+                abilities: [TokenAbility::REFRESH_ACCESS_TOKEN->value]
+            )
+        ]);
+
+        $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
+    }
+
+    #[Test]
+    public function authorize_WhenUserHasAccessToApplication_ShouldReturnAccessInfo(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()
@@ -350,7 +381,7 @@ final class UserTest extends TestCase
             ->create();
 
         $query = ['key' => $application->key];
-        $response = $this->get(route('api.me', $query), [
+        $response = $this->get(route('api.authorize', $query), [
             'Accept' => 'appllication/json',
             'Authorization' => 'Bearer '. $this->getToken(
                 $user,
@@ -375,36 +406,7 @@ final class UserTest extends TestCase
     }
 
     #[Test]
-    public function me_WhenTokenIsExpired_ShouldReturnUnauthorizedError(): void
-    {
-        /** @var \App\Models\User $user */
-        $user = User::factory()
-            ->create(['password' => 'zaq1@WSX']);
-
-        $application = Application::factory()
-            ->create(['key' => 'admin']);
-
-        UserApplication::factory()
-            ->for($user)
-            ->for($application)
-            ->create();
-
-        $query = ['key' => $application->key];
-        $response = $this->get(route('api.me', $query), [
-            'Accept' => 'appllication/json',
-            'Authorization' => 'Bearer '. $this->getToken(
-                $user,
-                'access-token',
-                [TokenAbility::ACCESS_API->value],
-                now()->subDay()
-            )
-        ]);
-
-        $response->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
-    }
-
-    #[Test]
-    public function me_WhenUserDoesntHaveAccessToApplication_ShouldReturnForbiddenError(): void
+    public function authorize_WhenUserDoesntHaveAccessToApplication_ShouldReturnForbiddenError(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create(['password' => 'zaq1@WSX']);
@@ -421,7 +423,7 @@ final class UserTest extends TestCase
             ->create(['application_id' => $applications[0]->id]);
 
         $query = ['key' => $applications[1]->key];
-        $response = $this->get(route('api.me', $query), [
+        $response = $this->get(route('api.authorize', $query), [
             'Accept' => 'appllication/json',
             'Authorization' => 'Bearer '. $this->getToken(
                 $user,
@@ -431,5 +433,90 @@ final class UserTest extends TestCase
         ]);
 
         $response->assertForbidden()->assertJsonPath('message', 'validation.forbidden_access');
+    }
+
+    #[Test]
+    public function me_WhenTokenHasIncorrectAbilities_ShouldForbiddenReturnError(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        $response = $this->get(route('api.me'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken(
+                user: $user,
+                abilities: [TokenAbility::REFRESH_ACCESS_TOKEN->value]
+            )
+        ]);
+
+        $response->assertForbidden()->assertJsonPath('message', 'Invalid ability provided.');
+    }
+
+    #[Test]
+    public function me_WhenUserHasAccessToApplications_ShouldReturnAccesses(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+        $application = Application::factory()->create([
+            'key' => 'admin',
+            'name' => 'Admin',
+            'url' => 'https://admin.bjascode.pl',
+        ]);
+
+        UserApplication::factory()
+            ->for($user)
+            ->for($application)
+            ->create();
+
+        $response = $this->get(route('api.me'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'access-token',
+                [TokenAbility::ACCESS_API->value]
+            )
+        ]);
+
+        $response->assertOk()
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('data', 4)
+                    ->has('data.applications', 1)
+                    ->has('data.applications.0', 3)
+                    ->whereAll([
+                        'data.id' => $user->id,
+                        'data.email' => $user->email,
+                        'data.user_name' => $user->userName,
+                        'data.applications.0.key' => $application->key,
+                        'data.applications.0.name' => $application->name,
+                        'data.applications.0.url' => $application->url,
+                    ])
+            );
+    }
+
+    #[Test]
+    public function me_WhenUserDoesntHaveAccessToApplications_ShouldReturnEmptyApplications(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create(['password' => 'zaq1@WSX']);
+
+        UserApplication::factory()->create();
+
+        $response = $this->get(route('api.me'), [
+            'Accept' => 'appllication/json',
+            'Authorization' => 'Bearer '. $this->getToken(
+                $user,
+                'access-token',
+                [TokenAbility::ACCESS_API->value]
+            )
+        ]);
+
+        $response->assertOk()
+            ->assertJson(
+                fn (AssertableJson $json) =>
+                $json->has('data', 4)
+                    ->has('data.applications', 0)
+                    ->where('data.applications', [])
+            );
     }
 }

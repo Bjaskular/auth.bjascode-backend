@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Auth\AuthorizationRequest;
 use App\Http\Requests\Auth\LoginUserRequest;
+use App\Http\Resources\AccessesResource;
 use App\Http\Resources\AuthenticationRefreshResource;
 use App\Http\Resources\AuthenticationResource;
 use App\Http\Resources\AuthorizationResource;
@@ -33,6 +34,7 @@ class AuthController extends Controller
      * @bodyParam password string required Example: zaq1@WSX
      *
      * @bjasResponseFile app/DocResponses/auth_controller_login.json {"pagination": false}
+     * @return \Illuminate\Http\JsonResponse
      */
     public function login(LoginUserRequest $request): JsonResponse
     {
@@ -41,6 +43,16 @@ class AuthController extends Controller
         return (new AuthenticationResource($userAccess))->response();
     }
 
+    /**
+     * DELETE: Logout user
+     *
+     * Deletes access and refresh token user.
+     *
+     * @header Authorization Bearer {token}
+     *
+     * @response 204
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function logout(): JsonResponse
     {
         $this->authService->logout();
@@ -55,10 +67,17 @@ class AuthController extends Controller
         return (new AuthenticationRefreshResource($accessToken))->response();
     }
 
-    public function me(AuthorizationRequest $request): JsonResponse
+    public function authorize(AuthorizationRequest $request): JsonResponse
     {
         $access = $this->authService->authorize($request->validated());
 
         return (new AuthorizationResource($access))->response();
+    }
+
+    public function me(): JsonResponse
+    {
+        $accesses = $this->authService->getAccesses();
+
+        return (new AccessesResource($accesses))->response();
     }
 }

@@ -36,6 +36,11 @@ class AuthService extends Service implements IAuthService
             throw new UnauthorizedException(__('validation.login_failed'));
         }
 
+        $user->tokens()
+            ->where('name', 'access_token')
+            ->orWhere('name', 'refresh_token')
+            ->delete();
+
         $accessToken = $user->createToken(
             'access_token',
             [TokenAbility::ACCESS_API->value],
@@ -94,5 +99,13 @@ class AuthService extends Service implements IAuthService
         }
 
         return $user;
+    }
+
+    public function getAccesses(): User
+    {
+        return $this->repository
+            ->with('applications', fn ($query) => $query->select(['key', 'name', 'url']))
+            ->where('users.id', $this->request->user()->id)
+            ->first();
     }
 }
