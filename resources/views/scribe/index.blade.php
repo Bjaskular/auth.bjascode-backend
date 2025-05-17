@@ -66,16 +66,19 @@
                 </li>
                                     <ul id="tocify-subheader-authorization" class="tocify-subheader">
                                                     <li class="tocify-item level-2" data-unique="authorization-POSTapi-login">
-                                <a href="#authorization-POSTapi-login">GET: Login user</a>
+                                <a href="#authorization-POSTapi-login">POST: Login user</a>
                             </li>
                                                                                 <li class="tocify-item level-2" data-unique="authorization-GETapi-me">
-                                <a href="#authorization-GETapi-me">GET api/me</a>
+                                <a href="#authorization-GETapi-me">GET: Accesses user</a>
+                            </li>
+                                                                                <li class="tocify-item level-2" data-unique="authorization-GETapi-authorize">
+                                <a href="#authorization-GETapi-authorize">GET: Authorize access user</a>
                             </li>
                                                                                 <li class="tocify-item level-2" data-unique="authorization-GETapi-refresh">
-                                <a href="#authorization-GETapi-refresh">GET api/refresh</a>
+                                <a href="#authorization-GETapi-refresh">GET: Refresh access token</a>
                             </li>
                                                                                 <li class="tocify-item level-2" data-unique="authorization-DELETEapi-logout">
-                                <a href="#authorization-DELETEapi-logout">DELETE api/logout</a>
+                                <a href="#authorization-DELETEapi-logout">DELETE: Logout user</a>
                             </li>
                                                                         </ul>
                             </ul>
@@ -86,7 +89,7 @@
     </ul>
 
     <ul class="toc-footer" id="last-updated">
-        <li>Last updated: May 16, 2025</li>
+        <li>Last updated: May 17, 2025</li>
     </ul>
 </div>
 
@@ -111,7 +114,7 @@ You can switch the language used with the tabs at the top right (or from the nav
 
     
 
-                                <h2 id="authorization-POSTapi-login">GET: Login user</h2>
+                                <h2 id="authorization-POSTapi-login">POST: Login user</h2>
 
 <p>
 </p>
@@ -174,21 +177,19 @@ fetch(url, {
                 <pre>
 
 <code class="language-json" style="max-height: 300px;">{
-    &quot;data&quot;: {
-        &quot;access_token&quot;: {
-            &quot;name&quot;: &quot;auth-bjascode-access-token&quot;,
-            &quot;value&quot;: &quot;{access_token}&quot;,
-            &quot;ttl&quot;: 3600,
-            &quot;expired_at&quot;: 1747411658
-        },
-        &quot;refresh_token&quot;: {
-            &quot;name&quot;: &quot;auth-bjascode-refresh-token&quot;,
-            &quot;value&quot;: &quot;{refresh_token}&quot;,
-            &quot;ttl&quot;: 604800,
-            &quot;expired_at&quot;: 1748009257
-        },
-        &quot;redirect_url&quot;: &quot;http://www.google.com&quot;
-    }
+    &quot;access_token&quot;: {
+        &quot;name&quot;: &quot;auth-bjascode-access-token&quot;,
+        &quot;value&quot;: &quot;{access_token}&quot;,
+        &quot;ttl&quot;: 3600,
+        &quot;expired_at&quot;: 1747411658
+    },
+    &quot;refresh_token&quot;: {
+        &quot;name&quot;: &quot;auth-bjascode-refresh-token&quot;,
+        &quot;value&quot;: &quot;{refresh_token}&quot;,
+        &quot;ttl&quot;: 604800,
+        &quot;expired_at&quot;: 1748009257
+    },
+    &quot;redirect_url&quot;: &quot;http://www.google.com&quot;
 }</code>
  </pre>
     </span>
@@ -280,12 +281,12 @@ You can check the Dev Tools console for debugging information.</code></pre>
         </div>
         </form>
 
-                    <h2 id="authorization-GETapi-me">GET api/me</h2>
+                    <h2 id="authorization-GETapi-me">GET: Accesses user</h2>
 
 <p>
 </p>
 
-
+<p>Returns accesses user.</p>
 
 <span id="example-requests-GETapi-me">
 <blockquote>Example request:</blockquote>
@@ -298,6 +299,7 @@ $response = $client-&gt;get(
     $url,
     [
         'headers' =&gt; [
+            'Authorization' =&gt; 'Bearer {access_token}',
             'Content-Type' =&gt; 'application/json',
             'Accept' =&gt; 'application/json',
         ],
@@ -313,6 +315,7 @@ print_r(json_decode((string) $body));</code></pre></div>
 );
 
 const headers = {
+    "Authorization": "Bearer {access_token}",
     "Content-Type": "application/json",
     "Accept": "application/json",
 };
@@ -326,20 +329,21 @@ fetch(url, {
 
 <span id="example-responses-GETapi-me">
             <blockquote>
-            <p>Example response (401):</p>
+            <p>Example response (200):</p>
         </blockquote>
-                <details class="annotation">
-            <summary style="cursor: pointer;">
-                <small onclick="textContent = parentElement.parentElement.open ? 'Show headers' : 'Hide headers'">Show headers</small>
-            </summary>
-            <pre><code class="language-http">cache-control: no-cache, private
-content-type: application/json
-access-control-allow-origin: http://localhost:3000
-access-control-allow-credentials: true
- </code></pre></details>         <pre>
+                <pre>
 
 <code class="language-json" style="max-height: 300px;">{
-    &quot;message&quot;: &quot;Unauthenticated.&quot;
+    &quot;id&quot;: &quot;9eeed122-ad33-4549-a778-10d570a265f8&quot;,
+    &quot;email&quot;: &quot;test1@wp.pl&quot;,
+    &quot;user_name&quot;: &quot;test1&quot;,
+    &quot;applications&quot;: [
+        {
+            &quot;name&quot;: &quot;Admin&quot;,
+            &quot;key&quot;: &quot;admin&quot;,
+            &quot;url&quot;: &quot;https://admin.bjascode.pl&quot;
+        }
+    ]
 }</code>
  </pre>
     </span>
@@ -374,6 +378,17 @@ You can check the Dev Tools console for debugging information.</code></pre>
         </p>
                 <h4 class="fancy-heading-panel"><b>Headers</b></h4>
                                 <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Authorization</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Authorization"                data-endpoint="GETapi-me"
+               value="Bearer {access_token}"
+               data-component="header">
+    <br>
+<p>Example: <code>Bearer {access_token}</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
                 <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
 &nbsp;
  &nbsp;
@@ -397,12 +412,136 @@ You can check the Dev Tools console for debugging information.</code></pre>
             </div>
                         </form>
 
-                    <h2 id="authorization-GETapi-refresh">GET api/refresh</h2>
+                    <h2 id="authorization-GETapi-authorize">GET: Authorize access user</h2>
 
 <p>
 </p>
 
+<p>Check if auth user has access to specific app.</p>
 
+<span id="example-requests-GETapi-authorize">
+<blockquote>Example request:</blockquote>
+
+
+<div class="php-example">
+    <pre><code class="language-php">$client = new \GuzzleHttp\Client();
+$url = 'http://localhost/api/authorize';
+$response = $client-&gt;get(
+    $url,
+    [
+        'headers' =&gt; [
+            'Authorization' =&gt; 'Bearer {access_token}',
+            'Content-Type' =&gt; 'application/json',
+            'Accept' =&gt; 'application/json',
+        ],
+    ]
+);
+$body = $response-&gt;getBody();
+print_r(json_decode((string) $body));</code></pre></div>
+
+
+<div class="javascript-example">
+    <pre><code class="language-javascript">const url = new URL(
+    "http://localhost/api/authorize"
+);
+
+const headers = {
+    "Authorization": "Bearer {access_token}",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+};
+
+fetch(url, {
+    method: "GET",
+    headers,
+}).then(response =&gt; response.json());</code></pre></div>
+
+</span>
+
+<span id="example-responses-GETapi-authorize">
+            <blockquote>
+            <p>Example response (200):</p>
+        </blockquote>
+                <pre>
+
+<code class="language-json" style="max-height: 300px;">{
+    &quot;id&quot;: &quot;9eeed122-ad33-4549-a778-10d570a265f8&quot;,
+    &quot;application_key&quot;: &quot;admin&quot;,
+    &quot;application_secret&quot;: &quot;eyJpdiI6IkNTOG42bjBFTUhCSmFzS25YZ3kvSVE9PSIsInZhbHVlIjoiYlh0c2hzQnk5dG5ydW5pMlo1NTVNcjFDSXFVZGpVaTRueUMyTnBuNHVSN21KSTNjZEFaNzBFT0ZqWmxPbVJKMSIsIm1hYyI6IjNiN2M4ZGM0YjRkOThhZmIxZmZhYWNiMmFjMzBjOWRkY2I3YWFlOWQ4ZjhjMWJkYTJmNDdhOTcxZjFjNzVlODgiLCJ0YWciOiIifA==&quot;
+}</code>
+ </pre>
+    </span>
+<span id="execution-results-GETapi-authorize" hidden>
+    <blockquote>Received response<span
+                id="execution-response-status-GETapi-authorize"></span>:
+    </blockquote>
+    <pre class="json"><code id="execution-response-content-GETapi-authorize"
+      data-empty-response-text="<Empty response>" style="max-height: 400px;"></code></pre>
+</span>
+<span id="execution-error-GETapi-authorize" hidden>
+    <blockquote>Request failed with error:</blockquote>
+    <pre><code id="execution-error-message-GETapi-authorize">
+
+Tip: Check that you&#039;re properly connected to the network.
+If you&#039;re a maintainer of ths API, verify that your API is running and you&#039;ve enabled CORS.
+You can check the Dev Tools console for debugging information.</code></pre>
+</span>
+<form id="form-GETapi-authorize" data-method="GET"
+      data-path="api/authorize"
+      data-authed="0"
+      data-hasfiles="0"
+      data-isarraybody="0"
+      autocomplete="off"
+      onsubmit="event.preventDefault(); executeTryOut('GETapi-authorize', this);">
+    <h3>
+        Request&nbsp;&nbsp;&nbsp;
+            </h3>
+            <p>
+            <small class="badge badge-green">GET</small>
+            <b><code>api/authorize</code></b>
+        </p>
+                <h4 class="fancy-heading-panel"><b>Headers</b></h4>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Authorization</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Authorization"                data-endpoint="GETapi-authorize"
+               value="Bearer {access_token}"
+               data-component="header">
+    <br>
+<p>Example: <code>Bearer {access_token}</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Content-Type"                data-endpoint="GETapi-authorize"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Accept</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Accept"                data-endpoint="GETapi-authorize"
+               value="application/json"
+               data-component="header">
+    <br>
+<p>Example: <code>application/json</code></p>
+            </div>
+                        </form>
+
+                    <h2 id="authorization-GETapi-refresh">GET: Refresh access token</h2>
+
+<p>
+</p>
+
+<p>Returns new access token</p>
 
 <span id="example-requests-GETapi-refresh">
 <blockquote>Example request:</blockquote>
@@ -415,6 +554,7 @@ $response = $client-&gt;get(
     $url,
     [
         'headers' =&gt; [
+            'Authorization' =&gt; 'Bearer {refresh_token}',
             'Content-Type' =&gt; 'application/json',
             'Accept' =&gt; 'application/json',
         ],
@@ -430,6 +570,7 @@ print_r(json_decode((string) $body));</code></pre></div>
 );
 
 const headers = {
+    "Authorization": "Bearer {refresh_token}",
     "Content-Type": "application/json",
     "Accept": "application/json",
 };
@@ -443,20 +584,15 @@ fetch(url, {
 
 <span id="example-responses-GETapi-refresh">
             <blockquote>
-            <p>Example response (401):</p>
+            <p>Example response (200):</p>
         </blockquote>
-                <details class="annotation">
-            <summary style="cursor: pointer;">
-                <small onclick="textContent = parentElement.parentElement.open ? 'Show headers' : 'Hide headers'">Show headers</small>
-            </summary>
-            <pre><code class="language-http">cache-control: no-cache, private
-content-type: application/json
-access-control-allow-origin: http://localhost:3000
-access-control-allow-credentials: true
- </code></pre></details>         <pre>
+                <pre>
 
 <code class="language-json" style="max-height: 300px;">{
-    &quot;message&quot;: &quot;Unauthenticated.&quot;
+    &quot;name&quot;: &quot;auth-bjascode-access-token&quot;,
+    &quot;value&quot;: &quot;{access_token}&quot;,
+    &quot;ttl&quot;: 3600,
+    &quot;expired_at&quot;: 1747411658
 }</code>
  </pre>
     </span>
@@ -491,6 +627,17 @@ You can check the Dev Tools console for debugging information.</code></pre>
         </p>
                 <h4 class="fancy-heading-panel"><b>Headers</b></h4>
                                 <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Authorization</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Authorization"                data-endpoint="GETapi-refresh"
+               value="Bearer {refresh_token}"
+               data-component="header">
+    <br>
+<p>Example: <code>Bearer {refresh_token}</code></p>
+            </div>
+                                <div style="padding-left: 28px; clear: unset;">
                 <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
 &nbsp;
  &nbsp;
@@ -514,12 +661,12 @@ You can check the Dev Tools console for debugging information.</code></pre>
             </div>
                         </form>
 
-                    <h2 id="authorization-DELETEapi-logout">DELETE api/logout</h2>
+                    <h2 id="authorization-DELETEapi-logout">DELETE: Logout user</h2>
 
 <p>
 </p>
 
-
+<p>Deletes access and refresh token user.</p>
 
 <span id="example-requests-DELETEapi-logout">
 <blockquote>Example request:</blockquote>
@@ -532,6 +679,7 @@ $response = $client-&gt;delete(
     $url,
     [
         'headers' =&gt; [
+            'Authorization' =&gt; 'Bearer {access_token}',
             'Content-Type' =&gt; 'application/json',
             'Accept' =&gt; 'application/json',
         ],
@@ -547,6 +695,7 @@ print_r(json_decode((string) $body));</code></pre></div>
 );
 
 const headers = {
+    "Authorization": "Bearer {access_token}",
     "Content-Type": "application/json",
     "Accept": "application/json",
 };
@@ -559,7 +708,13 @@ fetch(url, {
 </span>
 
 <span id="example-responses-DELETEapi-logout">
-</span>
+            <blockquote>
+            <p>Example response (204):</p>
+        </blockquote>
+                <pre>
+<code>Empty response</code>
+ </pre>
+    </span>
 <span id="execution-results-DELETEapi-logout" hidden>
     <blockquote>Received response<span
                 id="execution-response-status-DELETEapi-logout"></span>:
@@ -590,6 +745,17 @@ You can check the Dev Tools console for debugging information.</code></pre>
             <b><code>api/logout</code></b>
         </p>
                 <h4 class="fancy-heading-panel"><b>Headers</b></h4>
+                                <div style="padding-left: 28px; clear: unset;">
+                <b style="line-height: 2;"><code>Authorization</code></b>&nbsp;&nbsp;
+&nbsp;
+ &nbsp;
+                <input type="text" style="display: none"
+                              name="Authorization"                data-endpoint="DELETEapi-logout"
+               value="Bearer {access_token}"
+               data-component="header">
+    <br>
+<p>Example: <code>Bearer {access_token}</code></p>
+            </div>
                                 <div style="padding-left: 28px; clear: unset;">
                 <b style="line-height: 2;"><code>Content-Type</code></b>&nbsp;&nbsp;
 &nbsp;

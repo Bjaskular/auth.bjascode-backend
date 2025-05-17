@@ -1,0 +1,6 @@
+{
+    "name": "auth-bjascode-access-token",
+    "value": "{access_token}",
+    "ttl": 3600,
+    "expired_at": 1747411658
+}

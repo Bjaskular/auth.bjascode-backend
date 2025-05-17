@@ -10,7 +10,7 @@ endpoints:
       groupDescription: ''
       subgroup: ''
       subgroupDescription: ''
-      title: 'GET: Login user'
+      title: 'POST: Login user'
       description: 'Returns access and refresh tokens with redirect url.'
       authenticated: false
       custom: []
@@ -60,7 +60,22 @@ endpoints:
     responses:
       -
         status: 200
-        content: '{"data":{"access_token":{"name":"auth-bjascode-access-token","value":"{access_token}","ttl":3600,"expired_at":1747411658},"refresh_token":{"name":"auth-bjascode-refresh-token","value":"{refresh_token}","ttl":604800,"expired_at":1748009257},"redirect_url":"http:\/\/www.google.com"}}'
+        content: |
+          {
+              "access_token": {
+                  "name": "auth-bjascode-access-token",
+                  "value": "{access_token}",
+                  "ttl": 3600,
+                  "expired_at": 1747411658
+              },
+              "refresh_token": {
+                  "name": "auth-bjascode-refresh-token",
+                  "value": "{refresh_token}",
+                  "ttl": 604800,
+                  "expired_at": 1748009257
+              },
+              "redirect_url": "http://www.google.com"
+          }
         headers: []
         description: ''
         custom: []
@@ -79,11 +94,12 @@ endpoints:
       groupDescription: ''
       subgroup: ''
       subgroupDescription: ''
-      title: ''
-      description: ''
+      title: 'GET: Accesses user'
+      description: 'Returns accesses user.'
       authenticated: false
       custom: []
     headers:
+      Authorization: 'Bearer {access_token}'
       Content-Type: application/json
       Accept: application/json
     urlParameters: []
@@ -95,14 +111,64 @@ endpoints:
     fileParameters: []
     responses:
       -
-        status: 401
-        content: '{"message":"Unauthenticated."}'
-        headers:
-          cache-control: 'no-cache, private'
-          content-type: application/json
-          access-control-allow-origin: 'http://localhost:3000'
-          access-control-allow-credentials: 'true'
-        description: null
+        status: 200
+        content: |
+          {
+              "id": "9eeed122-ad33-4549-a778-10d570a265f8",
+              "email": "test1@wp.pl",
+              "user_name": "test1",
+              "applications": [
+                  {
+                      "name": "Admin",
+                      "key": "admin",
+                      "url": "https://admin.bjascode.pl"
+                  }
+              ]
+          }
+        headers: []
+        description: ''
+        custom: []
+    responseFields: []
+    auth: []
+    controller: null
+    method: null
+    route: null
+    custom: []
+  -
+    httpMethods:
+      - GET
+    uri: api/authorize
+    metadata:
+      groupName: Authorization
+      groupDescription: ''
+      subgroup: ''
+      subgroupDescription: ''
+      title: 'GET: Authorize access user'
+      description: 'Check if auth user has access to specific app.'
+      authenticated: false
+      custom: []
+    headers:
+      Authorization: 'Bearer {access_token}'
+      Content-Type: application/json
+      Accept: application/json
+    urlParameters: []
+    cleanUrlParameters: []
+    queryParameters: []
+    cleanQueryParameters: []
+    bodyParameters: []
+    cleanBodyParameters: []
+    fileParameters: []
+    responses:
+      -
+        status: 200
+        content: |
+          {
+              "id": "9eeed122-ad33-4549-a778-10d570a265f8",
+              "application_key": "admin",
+              "application_secret": "eyJpdiI6IkNTOG42bjBFTUhCSmFzS25YZ3kvSVE9PSIsInZhbHVlIjoiYlh0c2hzQnk5dG5ydW5pMlo1NTVNcjFDSXFVZGpVaTRueUMyTnBuNHVSN21KSTNjZEFaNzBFT0ZqWmxPbVJKMSIsIm1hYyI6IjNiN2M4ZGM0YjRkOThhZmIxZmZhYWNiMmFjMzBjOWRkY2I3YWFlOWQ4ZjhjMWJkYTJmNDdhOTcxZjFjNzVlODgiLCJ0YWciOiIifA=="
+          }
+        headers: []
+        description: ''
         custom: []
     responseFields: []
     auth: []
@@ -119,11 +185,12 @@ endpoints:
       groupDescription: ''
       subgroup: ''
       subgroupDescription: ''
-      title: ''
-      description: ''
+      title: 'GET: Refresh access token'
+      description: 'Returns new access token'
       authenticated: false
       custom: []
     headers:
+      Authorization: 'Bearer {refresh_token}'
       Content-Type: application/json
       Accept: application/json
     urlParameters: []
@@ -135,14 +202,16 @@ endpoints:
     fileParameters: []
     responses:
       -
-        status: 401
-        content: '{"message":"Unauthenticated."}'
-        headers:
-          cache-control: 'no-cache, private'
-          content-type: application/json
-          access-control-allow-origin: 'http://localhost:3000'
-          access-control-allow-credentials: 'true'
-        description: null
+        status: 200
+        content: |
+          {
+              "name": "auth-bjascode-access-token",
+              "value": "{access_token}",
+              "ttl": 3600,
+              "expired_at": 1747411658
+          }
+        headers: []
+        description: ''
         custom: []
     responseFields: []
     auth: []
@@ -159,11 +228,12 @@ endpoints:
       groupDescription: ''
       subgroup: ''
       subgroupDescription: ''
-      title: ''
-      description: ''
+      title: 'DELETE: Logout user'
+      description: 'Deletes access and refresh token user.'
       authenticated: false
       custom: []
     headers:
+      Authorization: 'Bearer {access_token}'
       Content-Type: application/json
       Accept: application/json
     urlParameters: []
@@ -173,7 +243,13 @@ endpoints:
     bodyParameters: []
     cleanBodyParameters: []
     fileParameters: []
-    responses: []
+    responses:
+      -
+        status: 204
+        content: '{}'
+        headers: []
+        description: ''
+        custom: []
     responseFields: []
     auth: []
     controller: null

@@ -25,7 +25,7 @@ class AuthController extends Controller
     }
 
     /**
-     * GET: Login user
+     * POST: Login user
      *
      * Returns access and refresh tokens with redirect url.
      *
@@ -33,7 +33,7 @@ class AuthController extends Controller
      * @bodyParam email string required Example: test1@wp.pl
      * @bodyParam password string required Example: zaq1@WSX
      *
-     * @bjasResponseFile app/DocResponses/auth_controller_login.json {"pagination": false}
+     * @responseFile app/DocResponses/auth_controller_login.json
      * @return \Illuminate\Http\JsonResponse
      */
     public function login(LoginUserRequest $request): JsonResponse
@@ -48,7 +48,7 @@ class AuthController extends Controller
      *
      * Deletes access and refresh token user.
      *
-     * @header Authorization Bearer {token}
+     * @header Authorization Bearer {access_token}
      *
      * @response 204
      * @return \Illuminate\Http\JsonResponse
@@ -60,6 +60,16 @@ class AuthController extends Controller
         return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 
+    /**
+     * GET: Refresh access token
+     *
+     * Returns new access token
+     *
+     * @header Authorization Bearer {refresh_token}
+     *
+     * @responseFile app/DocResponses/auth_controller_refreshToken.json
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function refreshToken(): JsonResponse
     {
         $accessToken = $this->authService->refreshAccessToken();
@@ -67,6 +77,16 @@ class AuthController extends Controller
         return (new AuthenticationRefreshResource($accessToken))->response();
     }
 
+    /**
+     * GET: Authorize access user
+     *
+     * Check if auth user has access to specific app.
+     *
+     * @header Authorization Bearer {access_token}
+     *
+     * @responseFile app/DocResponses/auth_controller_authorize.json
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function authorize(AuthorizationRequest $request): JsonResponse
     {
         $access = $this->authService->authorize($request->validated());
@@ -74,6 +94,16 @@ class AuthController extends Controller
         return (new AuthorizationResource($access))->response();
     }
 
+    /**
+     * GET: Accesses user
+     *
+     * Returns accesses user.
+     *
+     * @header Authorization Bearer {access_token}
+     *
+     * @responseFile app/DocResponses/auth_controller_me.json
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function me(): JsonResponse
     {
         $accesses = $this->authService->getAccesses();
